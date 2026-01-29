@@ -10,11 +10,30 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Image,
 } from 'react-native';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, Typography, Emoticons } from '../../constants/theme';
 import TypingIndicator from '../../components/TypingIndicator';
+
+// Import buddy icons
+const buddyOnline = require('../../assets/images/buddy-online.png');
+const buddyAway = require('../../assets/images/buddy-away.png');
+const buddyOffline = require('../../assets/images/buddy-offline.png');
+
+// Get buddy icon based on status
+function getBuddyIcon(status: string) {
+  switch (status) {
+    case 'online': return buddyOnline;
+    case 'away':
+    case 'brb': return buddyAway;
+    case 'busy': return buddyOffline;
+    case 'offline':
+    default: return buddyOffline;
+  }
+}
 
 // Mock messages
 const mockMessages = [
@@ -51,7 +70,7 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Toolbar component
+// Toolbar component - MSN style with yellow/gold icons
 function Toolbar({ onNudge }: { onNudge: () => void }) {
   return (
     <View style={styles.toolbar}>
@@ -83,22 +102,12 @@ function Toolbar({ onNudge }: { onNudge: () => void }) {
   );
 }
 
-// Menu bar
-function MenuBar() {
-  return (
-    <View style={styles.menuBar}>
-      <Text style={styles.menuItem}>File</Text>
-      <Text style={styles.menuItem}>Edit</Text>
-      <Text style={styles.menuItem}>Actions</Text>
-      <Text style={styles.menuItem}>Tools</Text>
-      <Text style={styles.menuItem}>Help</Text>
-    </View>
-  );
-}
+// Menu bar - removed for mobile
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
+  const router = useRouter();
   const [messages, setMessages] = useState(mockMessages);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -178,14 +187,14 @@ export default function ChatScreen() {
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Menu Bar */}
-        <MenuBar />
-        
         {/* Toolbar */}
         <Toolbar onNudge={sendNudge} />
         
-        {/* To: header */}
+        {/* To: header with back button */}
         <View style={styles.toHeader}>
+          <Pressable onPress={() => router.push('/')} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </Pressable>
           <Text style={styles.toLabel}>To: </Text>
           <Text style={styles.toName}>{contact.name}</Text>
         </View>
@@ -212,7 +221,7 @@ export default function ChatScreen() {
                         {msg.sender === 'me' ? 'You' : contact.name.split(' ')[0]} says:
                       </Text>
                       <Text style={styles.messageText}>
-                        {replaceEmoticons(msg.text)}
+                        {'  '}{replaceEmoticons(msg.text)}
                       </Text>
                     </>
                   )}
@@ -228,8 +237,25 @@ export default function ChatScreen() {
 
           {/* Display picture sidebar */}
           <View style={styles.sidebar}>
+            {/* Contact's display picture */}
             <View style={styles.displayPicture}>
-              <Text style={styles.dpText}>👤</Text>
+              <Image 
+                source={getBuddyIcon(contact.status)} 
+                style={styles.dpImage} 
+                resizeMode="contain" 
+              />
+            </View>
+            
+            {/* Spacer */}
+            <View style={styles.sidebarSpacer} />
+            
+            {/* Your display picture */}
+            <View style={styles.displayPicture}>
+              <Image 
+                source={buddyOnline} 
+                style={styles.dpImage} 
+                resizeMode="contain" 
+              />
             </View>
           </View>
         </View>
@@ -258,7 +284,7 @@ export default function ChatScreen() {
               value={inputText}
               onChangeText={setInputText}
               placeholder="Type your message here..."
-              placeholderTextColor={Colors.textDisabled}
+              placeholderTextColor="#999"
               multiline
               onSubmitEditing={sendMessage}
             />
@@ -275,12 +301,15 @@ export default function ChatScreen() {
           </View>
         </View>
 
-        {/* Status bar */}
-        <View style={styles.statusBar}>
+        {/* Status bar / link */}
+        <LinearGradient
+          colors={['#8AC9F0', '#5EB3E8', '#3BA3E0']}
+          style={styles.statusBar}
+        >
           <Text style={styles.statusBarText}>
             Click for new Emoticons and Theme Packs from Blue Mountain
           </Text>
-        </View>
+        </LinearGradient>
       </KeyboardAvoidingView>
     </Animated.View>
   );
@@ -289,36 +318,20 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.windowBackground,
+    backgroundColor: '#D4E8F8',
   },
   keyboardAvoid: {
     flex: 1,
   },
   
-  // Menu bar
-  menuBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.panelBackground,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderMid,
-  },
-  menuItem: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textPrimary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  
   // Toolbar
   toolbar: {
     flexDirection: 'row',
-    backgroundColor: Colors.panelBackground,
+    backgroundColor: '#E8F4FC',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderMid,
+    borderBottomColor: '#A8D4F0',
     justifyContent: 'flex-start',
     gap: 4,
   },
@@ -328,30 +341,40 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   toolbarIcon: {
-    fontSize: 20,
+    fontSize: 24,
   },
   toolbarLabel: {
     fontSize: 9,
-    color: Colors.textPrimary,
+    color: '#333',
     marginTop: 2,
   },
   
   // To header
   toHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 6,
-    backgroundColor: Colors.white,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderMid,
+    borderBottomColor: '#A8D4F0',
+  },
+  backButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  backButtonText: {
+    fontSize: 18,
+    color: '#3BA3E0',
+    fontWeight: 'bold',
   },
   toLabel: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: '#666',
   },
   toName: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textPrimary,
+    fontSize: 12,
+    color: '#333',
     fontWeight: '500',
   },
   
@@ -359,74 +382,82 @@ const styles = StyleSheet.create({
   chatArea: {
     flex: 1,
     flexDirection: 'row',
+    padding: 4,
   },
   messagesPanel: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: Colors.borderDark,
-    margin: 4,
-    marginRight: 0,
+    borderColor: '#A8D4F0',
+    borderRadius: 2,
+    marginRight: 4,
   },
   messagesList: {
     flex: 1,
     padding: 8,
   },
   messageRow: {
-    marginBottom: 4,
+    marginBottom: 2,
   },
   messageSender: {
-    fontSize: Typography.fontSizes.sm,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   senderMe: {
-    color: '#0000FF',
+    color: '#0066CC',
   },
   senderThem: {
-    color: '#FF0000',
+    color: '#CC0000',
   },
   messageText: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textPrimary,
-    marginLeft: 8,
+    fontSize: 12,
+    color: '#333',
   },
   systemMessage: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: '#666',
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: 4,
   },
   typingText: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: '#666',
     fontStyle: 'italic',
   },
   
   // Sidebar
   sidebar: {
-    width: 100,
-    padding: 4,
+    width: 90,
     alignItems: 'center',
+    paddingTop: 4,
+    paddingBottom: 4,
+    justifyContent: 'space-between',
+  },
+  sidebarSpacer: {
+    flex: 1,
   },
   displayPicture: {
     width: 80,
     height: 80,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#5EB3E8',
+    borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  dpText: {
-    fontSize: 40,
+  dpImage: {
+    width: 70,
+    height: 70,
   },
   
   // Input area
   inputArea: {
-    backgroundColor: Colors.panelBackground,
+    backgroundColor: '#E8F4FC',
     borderTopWidth: 1,
-    borderTopColor: Colors.borderMid,
+    borderTopColor: '#A8D4F0',
   },
   emoticonBar: {
     flexDirection: 'row',
@@ -434,25 +465,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderMid,
+    borderBottomColor: '#A8D4F0',
+    backgroundColor: '#fff',
   },
   emoticonBarLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: Colors.textPrimary,
+    color: '#333',
     marginRight: 8,
   },
   emoticonDivider: {
     width: 1,
     height: 20,
-    backgroundColor: Colors.borderMid,
+    backgroundColor: '#A8D4F0',
     marginRight: 8,
   },
   emoticonButton: {
     paddingHorizontal: 4,
   },
   emoticonText: {
-    fontSize: 18,
+    fontSize: 20,
   },
   inputRow: {
     flexDirection: 'row',
@@ -460,11 +492,12 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: Colors.inputBg,
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    borderColor: '#A8D4F0',
+    borderRadius: 2,
     padding: 8,
-    fontSize: Typography.fontSizes.md,
+    fontSize: 12,
     minHeight: 60,
     maxHeight: 100,
     textAlignVertical: 'top',
@@ -474,30 +507,30 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sendButton: {
-    backgroundColor: Colors.buttonFace,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: '#8AC9F0',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderTopColor: Colors.borderLight,
-    borderLeftColor: Colors.borderLight,
-    borderBottomColor: Colors.borderDark,
-    borderRightColor: Colors.borderDark,
+    borderTopColor: '#C5E4F7',
+    borderLeftColor: '#C5E4F7',
+    borderBottomColor: '#5EB3E8',
+    borderRightColor: '#5EB3E8',
+    borderRadius: 4,
   },
   sendButtonText: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textPrimary,
+    fontSize: 12,
+    color: '#1a5a7a',
+    fontWeight: '500',
   },
   
   // Status bar
   statusBar: {
-    backgroundColor: Colors.panelBackground,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderMid,
+    paddingVertical: 6,
   },
   statusBarText: {
-    fontSize: Typography.fontSizes.xs,
-    color: Colors.textLink,
+    fontSize: 11,
+    color: '#1a5a7a',
+    textDecorationLine: 'underline',
   },
 });
