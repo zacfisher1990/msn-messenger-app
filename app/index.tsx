@@ -1,14 +1,26 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, Image, Modal, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Colors, Spacing, Typography, StatusOptions } from '../constants/theme';
 import { useUser } from '../context/UserContext';
 
+// Status colors for the indicator dots
+const statusColors: Record<string, string> = {
+  online: '#4CAF50',
+  busy: '#f44336',
+  brb: '#FF9800',
+  away: '#FF9800',
+  phone: '#f44336',
+  lunch: '#FF9800',
+  offline: '#9E9E9E',
+};
+
 // Import buddy icons for each status
 const buddyOnline = require('../assets/images/buddy-online.png');
 const buddyAway = require('../assets/images/buddy-away.png');
 const buddyOffline = require('../assets/images/buddy-offline.png');
+const buddyAdd = require('../assets/images/buddy-add.png');
 
 // Get buddy icon based on status
 function getBuddyIcon(status: string) {
@@ -98,7 +110,12 @@ function ContactGroup({
 
 export default function ContactsScreen() {
   const router = useRouter();
-  const { user, status } = useUser();
+  const { user, status, setStatus, setStatusMessage } = useUser();
+  
+  // Modal states
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [tempMessage, setTempMessage] = useState(user.statusMessage);
   
   const onlineContacts = mockContacts.filter(c => c.status === 'online');
   const awayContacts = mockContacts.filter(c => ['away', 'brb', 'lunch', 'phone'].includes(c.status));
@@ -108,13 +125,23 @@ export default function ContactsScreen() {
   const handleContactPress = (id: string) => {
     router.push(`/chat/${id}`);
   };
+  
+  const handleStatusSelect = (newStatus: string) => {
+    setStatus(newStatus);
+    setShowStatusModal(false);
+  };
+  
+  const handleMessageSave = () => {
+    setStatusMessage(tempMessage);
+    setShowMessageModal(false);
+  };
 
   return (
     <View style={styles.container}>
       
-      {/* MSN Header with gradient */}
+      {/* MSN Header with gradient - classic blue style */}
       <LinearGradient
-        colors={[Colors.msnHeaderStart, Colors.msnHeaderMid, Colors.msnHeaderEnd]}
+        colors={['#C5E4F7', '#8AC9F0', '#5EB3E8']}
         style={styles.msnHeader}
       >
         <View style={styles.headerContent}>
@@ -125,98 +152,207 @@ export default function ContactsScreen() {
           </View>
           
           {/* User profile section */}
-          <Pressable 
-            style={styles.userSection}
-            onPress={() => router.push('/status')}
-          >
+          <View style={styles.userSection}>
             <View style={styles.displayPicture}>
               <Image 
-                source={buddyOnline} 
+                source={getBuddyIcon(status)} 
                 style={styles.dpImage} 
                 resizeMode="contain" 
               />
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user.displayName}</Text>
-              <View style={styles.statusRow}>
+              
+              {/* Clickable status with chevron */}
+              <Pressable 
+                style={styles.statusDropdown}
+                onPress={() => setShowStatusModal(true)}
+              >
+                <View style={[styles.statusDot, { backgroundColor: statusColors[status] || statusColors.online }]} />
                 <Text style={styles.userStatus}>
                   ({StatusOptions.find(s => s.id === status)?.label || 'Online'})
                 </Text>
-              </View>
-              <Text style={styles.personalMessage} numberOfLines={1}>
-                {user.statusMessage || '<Type a personal message>'}
-              </Text>
+                <Text style={styles.chevron}>▼</Text>
+              </Pressable>
+              
+              {/* Clickable personal message with chevron */}
+              <Pressable 
+                style={styles.messageDropdown}
+                onPress={() => {
+                  setTempMessage(user.statusMessage);
+                  setShowMessageModal(true);
+                }}
+              >
+                <Text style={styles.personalMessage} numberOfLines={1}>
+                  {user.statusMessage || '<Type a personal message>'}
+                </Text>
+                <Text style={styles.chevron}>▼</Text>
+              </Pressable>
             </View>
-          </Pressable>
-          
-          {/* Quick links */}
-          <View style={styles.quickLinks}>
-            <Text style={styles.quickLink}>(0)</Text>
-            <Text style={styles.quickLink}>📧 My Space</Text>
-            <Text style={styles.quickLink}>🌐 MSN Today</Text>
           </View>
+          
+
         </View>
       </LinearGradient>
 
-      {/* Contact List */}
+      {/* Contact List with Tab Strip */}
       <View style={styles.contactListContainer}>
-        <ScrollView style={styles.contactList}>
-          {[...mockContacts].sort((a, b) => {
-            const order = { online: 0, away: 1, busy: 2, offline: 3 };
-            return (order[a.status as keyof typeof order] ?? 3) - (order[b.status as keyof typeof order] ?? 3);
-          }).map((contact) => (
-            <Pressable
-              key={contact.id}
-              style={({ pressed }) => [
-                styles.contactRow,
-                pressed && styles.contactRowPressed
-              ]}
-              onPress={() => handleContactPress(contact.id)}
-            >
-              <View style={styles.buddyIcon}>
+        {/* Left tab strip like original MSN */}
+        <View style={styles.tabStrip}>
+          <View style={[styles.tab, styles.tabActive]}>
+            <Image source={buddyOnline} style={styles.tabIconImage} resizeMode="contain" />
+          </View>
+          <View style={styles.tab}>
+            <Text style={styles.tabIconText}>🌐</Text>
+          </View>
+        </View>
+        
+        {/* Contact list area */}
+        <View style={styles.contactListInner}>
+          <ScrollView style={styles.contactList}>
+            {/* Add a Contact - at top like original MSN */}
+            <Pressable style={styles.addContactRow}>
+              <Image 
+                source={buddyAdd} 
+                style={{ width: 24, height: 24 }} 
+                resizeMode="contain" 
+              />
+              <Text style={styles.addContactTopText}>Add a Contact</Text>
+            </Pressable>
+            
+            {[...mockContacts].sort((a, b) => {
+              const order = { online: 0, away: 1, busy: 2, offline: 3 };
+              return (order[a.status as keyof typeof order] ?? 3) - (order[b.status as keyof typeof order] ?? 3);
+            }).map((contact) => (
+              <Pressable
+                key={contact.id}
+                style={({ pressed }) => [
+                  styles.contactRow,
+                  pressed && styles.contactRowPressed
+                ]}
+                onPress={() => handleContactPress(contact.id)}
+              >
                 <Image 
                   source={getBuddyIcon(contact.status)} 
-                  style={styles.buddyIconImage} 
+                  style={styles.contactBuddyIcon} 
                   resizeMode="contain" 
                 />
-              </View>
-              <View style={styles.contactInfo}>
-                <View style={styles.contactNameRow}>
+                <Text style={styles.contactText} numberOfLines={1}>
                   <Text style={styles.contactName}>{contact.name}</Text>
                   <Text style={styles.contactStatus}>
-                    ({contact.status === 'online' ? 'Online' : 
+                    {' '}({contact.status === 'online' ? 'Online' : 
                       contact.status === 'away' ? 'Away' : 
                       contact.status === 'busy' ? 'Busy' : 'Offline'})
                   </Text>
-                </View>
-                {contact.statusMessage ? (
-                  <Text style={styles.contactMessage} numberOfLines={1}>
-                    {contact.statusMessage}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Bottom section */}
-      <View style={styles.bottomSection}>
-        <TouchableOpacity style={styles.addContact}>
-          <Text style={styles.addContactIcon}>➕</Text>
-          <Text style={styles.addContactText}>Add a Contact</Text>
-        </TouchableOpacity>
-        
-        {/* Search bar */}
-        <View style={styles.searchBar}>
-          <View style={styles.searchInput}>
-            <Text style={styles.searchPlaceholder}>Search the web...</Text>
-          </View>
-          <TouchableOpacity style={styles.searchButton}>
-            <Text style={styles.searchButtonText}>Search</Text>
-          </TouchableOpacity>
+                  {contact.statusMessage ? (
+                    <Text style={styles.contactMessage}> - {contact.statusMessage}</Text>
+                  ) : null}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
       </View>
+
+      {/* Bottom section - classic MSN blue footer */}
+      <LinearGradient
+        colors={['#8AC9F0', '#5EB3E8', '#3BA3E0']}
+        style={styles.bottomSection}
+      >
+        <View style={styles.msnFooter}>
+          <Text style={styles.msnFooterLogo}>msn</Text>
+          <Text style={styles.msnFooterText}>Messenger</Text>
+        </View>
+      </LinearGradient>
+      
+      {/* Status Selection Modal */}
+      <Modal
+        visible={showStatusModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStatusModal(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setShowStatusModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>My Status:</Text>
+            <View style={styles.statusList}>
+              {StatusOptions.map((option) => (
+                <Pressable
+                  key={option.id}
+                  style={[
+                    styles.statusOption,
+                    status === option.id && styles.statusOptionSelected
+                  ]}
+                  onPress={() => handleStatusSelect(option.id)}
+                >
+                  <View style={styles.radioOuter}>
+                    {status === option.id && <View style={styles.radioInner} />}
+                  </View>
+                  <View style={[styles.statusDot, { backgroundColor: statusColors[option.id] || statusColors.online }]} />
+                  <Text style={styles.statusOptionText}>{option.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.modalButtons}>
+              <Pressable 
+                style={styles.modalButton}
+                onPress={() => setShowStatusModal(false)}
+              >
+                <Text style={styles.modalButtonText}>OK</Text>
+              </Pressable>
+              <Pressable 
+                style={styles.modalButton}
+                onPress={() => setShowStatusModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+      
+      {/* Personal Message Modal */}
+      <Modal
+        visible={showMessageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMessageModal(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setShowMessageModal(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Personal Message:</Text>
+            <TextInput
+              style={styles.messageInput}
+              value={tempMessage}
+              onChangeText={setTempMessage}
+              placeholder="Type a personal message"
+              placeholderTextColor="#999"
+              maxLength={100}
+            />
+            <Text style={styles.messageHint}>This message will be shown to your contacts</Text>
+            <View style={styles.modalButtons}>
+              <Pressable 
+                style={styles.modalButton}
+                onPress={handleMessageSave}
+              >
+                <Text style={styles.modalButtonText}>OK</Text>
+              </Pressable>
+              <Pressable 
+                style={styles.modalButton}
+                onPress={() => setShowMessageModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -264,7 +400,7 @@ const styles = StyleSheet.create({
   },
   messengerText: {
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
   
@@ -284,8 +420,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
+    borderWidth: 2,
+    borderColor: '#3BA3E0',
     overflow: 'hidden',
   },
   dpImage: {
@@ -306,6 +442,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
+  statusDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  messageDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  chevron: {
+    fontSize: 8,
+    color: Colors.textSecondary,
+    marginLeft: 4,
+  },
   userStatus: {
     fontSize: Typography.fontSizes.sm,
     color: Colors.textSecondary,
@@ -314,30 +471,77 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSizes.sm,
     color: Colors.textSecondary,
     fontStyle: 'italic',
-    marginTop: 4,
+    flex: 1,
   },
   
-  // Quick links
-  quickLinks: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    gap: 16,
-  },
-  quickLink: {
-    fontSize: Typography.fontSizes.sm,
-    color: Colors.textLink,
-  },
-  
-  // Contact list
+  // Contact list with tab strip
   contactListContainer: {
     flex: 1,
-    backgroundColor: Colors.listBackground,
+    flexDirection: 'row',
     margin: 4,
     borderWidth: 1,
-    borderColor: Colors.borderDark,
+    borderColor: '#A8D4F0',
+    backgroundColor: Colors.listBackground,
+  },
+  tabStrip: {
+    width: 28,
+    backgroundColor: '#D4E8F8',
+    borderRightWidth: 1,
+    borderRightColor: '#A8D4F0',
+    paddingTop: 4,
+  },
+  tab: {
+    width: 26,
+    height: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+    backgroundColor: '#E0F0FC',
+    borderWidth: 1,
+    borderTopColor: '#F0F8FF',
+    borderLeftColor: '#F0F8FF',
+    borderBottomColor: '#A8D4F0',
+    borderRightColor: '#A8D4F0',
+  },
+  tabActive: {
+    backgroundColor: Colors.listBackground,
+    borderRightColor: Colors.listBackground,
+    marginRight: -1,
+    zIndex: 1,
+  },
+  tabIcon: {
+    fontSize: 14,
+  },
+  tabIconImage: {
+    width: 18,
+    height: 18,
+  },
+  tabIconText: {
+    fontSize: 14,
+  },
+  contactListInner: {
+    flex: 1,
+    backgroundColor: Colors.listBackground,
   },
   contactList: {
     flex: 1,
+  },
+  
+  // Add a Contact row at top
+  addContactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  addContactTopText: {
+    marginLeft: 6,
+    fontSize: 12,
+    color: '#333',
+  },
+  addContactIcon: {
+    width: 24,
+    height: 24,
   },
   
   // Group styles
@@ -367,12 +571,16 @@ const styles = StyleSheet.create({
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 3,
     paddingHorizontal: 8,
-    paddingLeft: 24,
   },
   contactRowPressed: {
     backgroundColor: Colors.selectionBg,
+  },
+  contactBuddyIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 6,
   },
   buddyIcon: {
     width: 32,
@@ -385,6 +593,10 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
   },
+  contactText: {
+    flex: 1,
+    fontSize: 12,
+  },
   contactInfo: {
     flex: 1,
   },
@@ -393,26 +605,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contactName: {
-    fontSize: Typography.fontSizes.sm,
+    fontSize: 12,
     color: Colors.textPrimary,
+    fontWeight: '500',
   },
   contactStatus: {
-    fontSize: Typography.fontSizes.xs,
-    color: Colors.textSecondary,
-    marginLeft: 4,
+    fontSize: 12,
+    color: '#888',
   },
   contactMessage: {
-    fontSize: Typography.fontSizes.xs,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: '#888',
     fontStyle: 'italic',
   },
   
-  // Bottom section
+  // Bottom section - MSN footer
   bottomSection: {
-    backgroundColor: Colors.panelBackground,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.borderDark,
-    padding: 8,
+    borderTopColor: '#5EB3E8',
+  },
+  msnFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  msnFooterLogo: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+    color: '#FFFFFF',
+    marginRight: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  msnFooterText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   addContact: {
     flexDirection: 'row',
@@ -458,5 +693,101 @@ const styles = StyleSheet.create({
   searchButtonText: {
     fontSize: Typography.fontSizes.sm,
     color: Colors.textPrimary,
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    padding: 16,
+    width: '85%',
+    maxWidth: 350,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+  },
+  modalTitle: {
+    fontSize: Typography.fontSizes.md,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    marginBottom: 12,
+  },
+  statusList: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    borderRadius: 2,
+    padding: 8,
+    marginBottom: 12,
+  },
+  statusOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  statusOptionSelected: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  radioOuter: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#666',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    backgroundColor: Colors.white,
+  },
+  radioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0066cc',
+  },
+  statusOptionText: {
+    fontSize: Typography.fontSizes.sm,
+    color: Colors.textPrimary,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  modalButton: {
+    backgroundColor: Colors.buttonFace,
+    paddingHorizontal: 24,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderTopColor: Colors.borderLight,
+    borderLeftColor: Colors.borderLight,
+    borderBottomColor: Colors.borderDark,
+    borderRightColor: Colors.borderDark,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontSize: Typography.fontSizes.sm,
+    color: Colors.textPrimary,
+  },
+  messageInput: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    padding: 8,
+    fontSize: Typography.fontSizes.sm,
+    marginBottom: 8,
+  },
+  messageHint: {
+    fontSize: Typography.fontSizes.xs,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    marginBottom: 12,
   },
 });
